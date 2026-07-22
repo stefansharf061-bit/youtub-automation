@@ -1,0 +1,6 @@
+{
+  "name": "ChannelOS - AI YouTube Publishing Platform",
+  "description": "Production-ready AI-powered YouTube Publishing Platform with automated Gemini metadata generation, video uploading, analytics dashboard, and AI insights.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
