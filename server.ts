@@ -27,8 +27,9 @@ const getSecretKey = () => process.env.GOOGLE_CLIENT_SECRET || process.env.JWT_S
 const SYSTEM_DEFAULT_USER_ID = '00000000-0000-0000-0000-000000000000';
 
 // Supabase Server Client setup
-const supabaseUrl = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
-const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.VITE_SUPABASE_ANON_KEY;
+const rawSupabaseUrl = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL || '';
+const supabaseUrl = rawSupabaseUrl ? rawSupabaseUrl.replace(/\/rest\/v1\/?$/i, '').replace(/\/+$/, '') : '';
+const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.VITE_SUPABASE_ANON_KEY || '';
 const supabaseServer = (supabaseUrl && supabaseKey && !supabaseUrl.includes('xyzcompany'))
   ? createClient(supabaseUrl, supabaseKey)
   : null;
