@@ -21,9 +21,34 @@ import {
 import { VideoItem, AIReport, UserSettings, NotificationItem, PublishLog, YouTubeAccount } from './src/types.js';
 
 // Environment & Credentials Configuration
-const getGoogleClientId = () => process.env.GOOGLE_CLIENT_ID || '';
-const getGoogleClientSecret = () => process.env.GOOGLE_CLIENT_SECRET || '';
-const getSecretKey = () => process.env.GOOGLE_CLIENT_SECRET || process.env.JWT_SECRET || 'channelos-production-secret-key';
+const cleanEnvVar = (val: string | undefined): string => {
+  if (!val) return '';
+  return val.trim().replace(/^["']|["']$/g, '');
+};
+
+const getGoogleClientId = (): string => {
+  return (
+    cleanEnvVar(process.env.GOOGLE_CLIENT_ID) ||
+    cleanEnvVar(process.env.VITE_GOOGLE_CLIENT_ID) ||
+    cleanEnvVar(process.env.YOUTUBE_CLIENT_ID) ||
+    cleanEnvVar(process.env.GOOGLE_OAUTH_CLIENT_ID) ||
+    cleanEnvVar(process.env.CLIENT_ID) ||
+    ''
+  );
+};
+
+const getGoogleClientSecret = (): string => {
+  return (
+    cleanEnvVar(process.env.GOOGLE_CLIENT_SECRET) ||
+    cleanEnvVar(process.env.VITE_GOOGLE_CLIENT_SECRET) ||
+    cleanEnvVar(process.env.YOUTUBE_CLIENT_SECRET) ||
+    cleanEnvVar(process.env.GOOGLE_OAUTH_CLIENT_SECRET) ||
+    cleanEnvVar(process.env.CLIENT_SECRET) ||
+    ''
+  );
+};
+
+const getSecretKey = () => getGoogleClientSecret() || cleanEnvVar(process.env.JWT_SECRET) || 'channelos-production-secret-key';
 const SYSTEM_DEFAULT_USER_ID = '00000000-0000-0000-0000-000000000000';
 
 // Supabase Server Client setup
@@ -121,9 +146,18 @@ function verifyOAuthState(state: string): string | null {
 function getOAuth2ClientForUser(req: express.Request, userId: string) {
   let host = process.env.APP_URL;
   if (!host && req) {
-    host = `${req.protocol}://${req.get('host')}`;
+    let protocol = (req.headers['x-forwarded-proto'] as string) || req.protocol || 'https';
+    if (Array.isArray(protocol)) protocol = protocol[0];
+    let hostHeader = (req.headers['x-forwarded-host'] as string) || req.get('host') || '';
+    if (Array.isArray(hostHeader)) hostHeader = hostHeader[0];
+    
+    // Ensure HTTPS on Vercel
+    if (hostHeader.includes('vercel.app')) {
+      protocol = 'https';
+    }
+    host = `${protocol}://${hostHeader}`;
   }
-  if (!host) {
+  if (!host || host.includes('undefined')) {
     host = 'http://localhost:3000';
   }
 
