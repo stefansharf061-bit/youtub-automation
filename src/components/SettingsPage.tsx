@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Settings as SettingsIcon,
   Youtube,
@@ -12,6 +12,8 @@ import {
   ShieldCheck,
   RotateCcw,
   Sparkles,
+  RefreshCw,
+  AlertTriangle,
 } from 'lucide-react';
 import { UserSettings, YouTubeAccount } from '../types';
 
@@ -22,14 +24,49 @@ interface SettingsPageProps {
   onToggleYouTubeConnect: () => void;
 }
 
+interface HealthData {
+  googleConfigured?: boolean;
+  geminiConfigured?: boolean;
+  supabaseConfigured?: boolean;
+  diagnostics?: {
+    googleClientIdPresent: boolean;
+    googleClientIdLength: number;
+    googleClientSecretPresent: boolean;
+    googleClientSecretLength: number;
+    supabaseUrlPresent: boolean;
+    supabaseKeyPresent: boolean;
+    vercelEnvironment: string;
+  };
+}
+
 export const SettingsPage: React.FC<SettingsPageProps> = ({
   settings,
   youtubeAccount,
   onUpdateSettings,
   onToggleYouTubeConnect,
 }) => {
-  const [geminiStatus, setGeminiStatus] = useState<boolean>(true);
   const [saveSuccess, setSaveSuccess] = useState(false);
+  const [healthData, setHealthData] = useState<HealthData | null>(null);
+  const [checkingHealth, setCheckingHealth] = useState(false);
+
+  const fetchHealth = async () => {
+    setCheckingHealth(true);
+    try {
+      const res = await fetch('/api/health');
+      if (res.ok) {
+        const data = await res.json();
+        setHealthData(data);
+      }
+    } catch (err) {
+      console.error('Failed to fetch health diagnostic:', err);
+    } finally {
+      setCheckingHealth(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchHealth();
+  }, []);
 
   const handleSave = () => {
     setSaveSuccess(true);
@@ -143,6 +180,128 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
             Ready
           </span>
         </div>
+      </div>
+
+      {/* 2.5 Server Environment Variables Diagnostic Check */}
+      <div className="p-6 rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm space-y-4">
+        <div className="flex items-center justify-between pb-4 border-b border-slate-100 dark:border-slate-800">
+          <div className="flex items-center space-x-3">
+            <div className="w-10 h-10 rounded-2xl bg-amber-500/10 text-amber-600 flex items-center justify-center font-bold">
+              <Key className="w-5 h-5" />
+            </div>
+            <div>
+              <h3 className="font-extrabold text-sm text-slate-900 dark:text-white">
+                Server Environment Variables Diagnostic
+              </h3>
+              <p className="text-xs text-slate-500">
+                Live verification of environment variables loaded by the active backend deployment
+              </p>
+            </div>
+          </div>
+          <button
+            onClick={fetchHealth}
+            disabled={checkingHealth}
+            className="flex items-center space-x-1.5 px-3 py-1.5 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 text-xs font-bold text-slate-700 dark:text-slate-300 transition-all cursor-pointer"
+          >
+            <RefreshCw className={`w-3.5 h-3.5 ${checkingHealth ? 'animate-spin' : ''}`} />
+            <span>{checkingHealth ? 'Checking...' : 'Refresh Diagnostic'}</span>
+          </button>
+        </div>
+
+        {healthData && healthData.diagnostics && (
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+            <div className={`p-3.5 rounded-2xl border flex items-center justify-between ${
+              healthData.diagnostics.googleClientIdPresent
+                ? 'bg-emerald-500/5 border-emerald-500/30'
+                : 'bg-red-500/5 border-red-500/30'
+            }`}>
+              <div className="space-y-0.5">
+                <span className="font-bold block text-slate-900 dark:text-white">GOOGLE_CLIENT_ID</span>
+                <span className="text-[11px] text-slate-500 dark:text-slate-400">
+                  {healthData.diagnostics.googleClientIdPresent
+                    ? `Detected (${healthData.diagnostics.googleClientIdLength} chars)`
+                    : 'Missing in active build'}
+                </span>
+              </div>
+              {healthData.diagnostics.googleClientIdPresent ? (
+                <CheckCircle2 className="w-5 h-5 text-emerald-500" />
+              ) : (
+                <XCircle className="w-5 h-5 text-red-500" />
+              )}
+            </div>
+
+            <div className={`p-3.5 rounded-2xl border flex items-center justify-between ${
+              healthData.diagnostics.googleClientSecretPresent
+                ? 'bg-emerald-500/5 border-emerald-500/30'
+                : 'bg-red-500/5 border-red-500/30'
+            }`}>
+              <div className="space-y-0.5">
+                <span className="font-bold block text-slate-900 dark:text-white">GOOGLE_CLIENT_SECRET</span>
+                <span className="text-[11px] text-slate-500 dark:text-slate-400">
+                  {healthData.diagnostics.googleClientSecretPresent
+                    ? `Detected (${healthData.diagnostics.googleClientSecretLength} chars)`
+                    : 'Missing in active build'}
+                </span>
+              </div>
+              {healthData.diagnostics.googleClientSecretPresent ? (
+                <CheckCircle2 className="w-5 h-5 text-emerald-500" />
+              ) : (
+                <XCircle className="w-5 h-5 text-red-500" />
+              )}
+            </div>
+
+            <div className={`p-3.5 rounded-2xl border flex items-center justify-between ${
+              healthData.diagnostics.supabaseUrlPresent
+                ? 'bg-emerald-500/5 border-emerald-500/30'
+                : 'bg-amber-500/5 border-amber-500/30'
+            }`}>
+              <div className="space-y-0.5">
+                <span className="font-bold block text-slate-900 dark:text-white">VITE_SUPABASE_URL</span>
+                <span className="text-[11px] text-slate-500 dark:text-slate-400">
+                  {healthData.diagnostics.supabaseUrlPresent ? 'Connected & Cleaned' : 'Not configured'}
+                </span>
+              </div>
+              {healthData.diagnostics.supabaseUrlPresent ? (
+                <CheckCircle2 className="w-5 h-5 text-emerald-500" />
+              ) : (
+                <AlertTriangle className="w-5 h-5 text-amber-500" />
+              )}
+            </div>
+
+            <div className={`p-3.5 rounded-2xl border flex items-center justify-between ${
+              healthData.geminiConfigured
+                ? 'bg-emerald-500/5 border-emerald-500/30'
+                : 'bg-amber-500/5 border-amber-500/30'
+            }`}>
+              <div className="space-y-0.5">
+                <span className="font-bold block text-slate-900 dark:text-white">GEMINI_API_KEY</span>
+                <span className="text-[11px] text-slate-500 dark:text-slate-400">
+                  {healthData.geminiConfigured ? 'Active & Ready' : 'Fallback active'}
+                </span>
+              </div>
+              {healthData.geminiConfigured ? (
+                <CheckCircle2 className="w-5 h-5 text-emerald-500" />
+              ) : (
+                <AlertTriangle className="w-5 h-5 text-amber-500" />
+              )}
+            </div>
+          </div>
+        )}
+
+        {healthData && healthData.diagnostics && (!healthData.diagnostics.googleClientIdPresent || !healthData.diagnostics.googleClientSecretPresent) && (
+          <div className="p-4 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-amber-700 dark:text-amber-300 text-xs flex items-start space-x-3">
+            <AlertTriangle className="w-5 h-5 text-amber-500 shrink-0 mt-0.5" />
+            <div className="space-y-1">
+              <span className="font-bold block">Action Required on Vercel:</span>
+              <p className="text-[11px] leading-relaxed">
+                You added <code>GOOGLE_CLIENT_ID</code> & <code>GOOGLE_CLIENT_SECRET</code> to Vercel settings, but Vercel requires a <strong>Redeploy</strong> for newly added environment variables to be injected into the serverless deployment.
+              </p>
+              <p className="text-[11px] leading-relaxed font-semibold">
+                Go to Vercel Dashboard → Deployments → Click <code>...</code> on your latest deployment → Click <strong>Redeploy</strong>.
+              </p>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* 3. Notification & Preferences */}

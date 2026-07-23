@@ -262,15 +262,26 @@ const requireAuth = async (req: AuthenticatedRequest, res: express.Response, nex
 
 app.use('/api', requireAuth);
 
-  // Health Check
+  // Health & Detailed Environment Diagnostics Check
   app.get('/api/health', (_req, res) => {
+    const clientId = getGoogleClientId();
+    const clientSecret = getGoogleClientSecret();
     res.json({
       status: 'ok',
       service: 'ChannelOS Production YouTube Engine',
       timestamp: new Date().toISOString(),
       geminiConfigured: !!process.env.GEMINI_API_KEY,
-      googleConfigured: !!getGoogleClientId() && !!getGoogleClientSecret(),
+      googleConfigured: !!clientId && !!clientSecret,
       supabaseConfigured: !!supabaseServer,
+      diagnostics: {
+        googleClientIdPresent: !!clientId,
+        googleClientIdLength: clientId.length,
+        googleClientSecretPresent: !!clientSecret,
+        googleClientSecretLength: clientSecret.length,
+        supabaseUrlPresent: !!supabaseUrl,
+        supabaseKeyPresent: !!supabaseKey,
+        vercelEnvironment: process.env.VERCEL_ENV || (process.env.VERCEL ? 'production' : 'local'),
+      },
     });
   });
 
