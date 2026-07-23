@@ -46,6 +46,62 @@ export default function App() {
     }
   }, [darkMode]);
 
+  // Sync initial state from server & Supabase on mount
+  useEffect(() => {
+    const fetchServerState = async () => {
+      try {
+        const [statusRes, videosRes, settingsRes] = await Promise.all([
+          fetch('/api/youtube/status'),
+          fetch('/api/videos'),
+          fetch('/api/settings'),
+        ]);
+
+        if (statusRes.ok) {
+          const statusData = await statusRes.json();
+          if (statusData.account) {
+            setYoutubeAccount(statusData.account);
+          }
+        }
+
+        if (videosRes.ok) {
+          const videosData = await videosRes.json();
+          if (videosData.videos && videosData.videos.length > 0) {
+            setVideos(videosData.videos);
+          }
+        }
+
+        if (settingsRes.ok) {
+          const settingsData = await settingsRes.json();
+          if (settingsData.settings) {
+            setSettings(settingsData.settings);
+          }
+        }
+      } catch (err) {
+        console.warn('Initial server state fetch warning:', err);
+      }
+    };
+
+    fetchServerState();
+
+    // Listen for OAuth success message from popup callback window
+    const handleMessage = (event: MessageEvent) => {
+      if (event.data && event.data.type === 'YOUTUBE_OAUTH_SUCCESS') {
+        console.log('[OAuth Listener] Google YouTube OAuth connection successful!');
+        if (event.data.account) {
+          setYoutubeAccount(event.data.account);
+        } else {
+          fetch('/api/youtube/status')
+            .then((r) => r.json())
+            .then((d) => d.account && setYoutubeAccount(d.account));
+        }
+        setSettings((prev) => ({ ...prev, youtubeConnected: true }));
+      }
+    };
+
+    window.addEventListener('message', handleMessage);
+    return () => window.removeEventListener('message', handleMessage);
+  }, []);
+
   // Handlers
   const handlePublishSuccess = (newVideo: VideoItem) => {
     setVideos((prev) => [newVideo, ...prev.filter((v) => v.id !== newVideo.id)]);
@@ -97,11 +153,34 @@ export default function App() {
     setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
   };
 
-  const handleToggleYouTubeConnect = () => {
-    setYoutubeAccount((prev) => ({
-      ...prev,
-      connected: !prev.connected,
-    }));
+  const handleToggleYouTubeConnect = async () => {
+    if (youtubeAccount.connected) {
+      try {
+        await fetch('/api/youtube/disconnect', { method: 'POST' });
+        setYoutubeAccount((prev) => ({ ...prev, connected: false }));
+        setSettings((prev) => ({ ...prev, youtubeConnected: false }));
+      } catch (err) {
+        console.error('Disconnect error:', err);
+      }
+    } else {
+      try {
+        const res = await fetch('/api/youtube/auth-url');
+        const data = await res.json();
+        if (data.authUrl) {
+          const width = 600;
+          const height = 700;
+          const left = window.screen.width / 2 - width / 2;
+          const top = window.screen.height / 2 - height / 2;
+          window.open(
+            data.authUrl,
+            'YouTube Google OAuth Authorization',
+            `width=${width},height=${height},top=${top},left=${left},scrollbars=yes`
+          );
+        }
+      } catch (err) {
+        console.error('OAuth initiation error:', err);
+      }
+    }
   };
 
   return (

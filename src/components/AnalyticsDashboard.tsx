@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   BarChart3,
   Eye,
@@ -33,7 +33,35 @@ import { ChannelAnalytics } from '../types';
 
 export const AnalyticsDashboard: React.FC = () => {
   const [timeframe, setTimeframe] = useState<'7d' | '30d' | '90d' | 'lifetime'>('30d');
-  const data: ChannelAnalytics = initialAnalytics[timeframe] || initialAnalytics['30d'];
+  const [data, setData] = useState<ChannelAnalytics>(initialAnalytics['30d']);
+  const [isLiveConnected, setIsLiveConnected] = useState<boolean>(false);
+  const [isLoading, setIsLoading] = useState<boolean>(false);
+
+  useEffect(() => {
+    let isMounted = true;
+    const fetchAnalytics = async () => {
+      setIsLoading(true);
+      try {
+        const res = await fetch(`/api/analytics?timeframe=${timeframe}`);
+        if (res.ok) {
+          const result = await res.json();
+          if (isMounted && result.analytics) {
+            setData(result.analytics);
+            setIsLiveConnected(!!result.liveConnected);
+          }
+        }
+      } catch (err) {
+        console.warn('Analytics fetch note:', err);
+      } finally {
+        if (isMounted) setIsLoading(false);
+      }
+    };
+
+    fetchAnalytics();
+    return () => {
+      isMounted = false;
+    };
+  }, [timeframe]);
 
   const COLORS = ['#ef4444', '#3b82f6', '#8b5cf6', '#10b981', '#f59e0b'];
 

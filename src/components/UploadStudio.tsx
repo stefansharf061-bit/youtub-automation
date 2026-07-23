@@ -107,19 +107,39 @@ export const UploadStudio: React.FC<UploadStudioProps> = ({ onPublishSuccess, on
 
       // Step 3: YouTube Data API v3 Upload & Metadata Synchronization
       setPublishStep(3);
-      const publishRes = await fetch('/api/youtube/publish', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          title: generatedMeta?.title || videoTitle,
-          topic,
-          visibility,
-          scheduledAt: scheduledAt || undefined,
-          metadata: generatedMeta,
-          videoUrl: videoPreviewUrl || 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4',
-          thumbnailUrl: thumbnailPreviewUrl || 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=800&auto=format&fit=crop&q=80',
-        }),
-      });
+
+      let publishRes: Response;
+      if (videoFile || thumbnailFile) {
+        const formData = new FormData();
+        if (videoFile) formData.append('video', videoFile);
+        if (thumbnailFile) formData.append('thumbnail', thumbnailFile);
+        formData.append('title', generatedMeta?.title || videoTitle);
+        if (topic) formData.append('topic', topic);
+        formData.append('visibility', visibility);
+        if (scheduledAt) formData.append('scheduledAt', scheduledAt);
+        formData.append('metadata', JSON.stringify(generatedMeta));
+        if (videoPreviewUrl) formData.append('videoUrl', videoPreviewUrl);
+        if (thumbnailPreviewUrl) formData.append('thumbnailUrl', thumbnailPreviewUrl);
+
+        publishRes = await fetch('/api/youtube/publish', {
+          method: 'POST',
+          body: formData,
+        });
+      } else {
+        publishRes = await fetch('/api/youtube/publish', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            title: generatedMeta?.title || videoTitle,
+            topic,
+            visibility,
+            scheduledAt: scheduledAt || undefined,
+            metadata: generatedMeta,
+            videoUrl: videoPreviewUrl || 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4',
+            thumbnailUrl: thumbnailPreviewUrl || 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=800&auto=format&fit=crop&q=80',
+          }),
+        });
+      }
 
       const publishData = await publishRes.json();
       if (!publishRes.ok) throw new Error(publishData.message || 'YouTube publishing failed');
