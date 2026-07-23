@@ -8,7 +8,6 @@ import rateLimit from 'express-rate-limit';
 import cookieParser from 'cookie-parser';
 import { google } from 'googleapis';
 import { createClient } from '@supabase/supabase-js';
-import { createServer as createViteServer } from 'vite';
 import { generateYouTubeMetadata, generateAIVideoReport } from './src/lib/gemini.js';
 import {
   initialVideos,
@@ -202,65 +201,65 @@ interface AuthenticatedRequest extends express.Request {
   };
 }
 
-async function startServer() {
-  const app = express();
-  const PORT = 3000;
+// Create Express Application
+export const app = express();
+const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 3000;
 
-  // Enable trust proxy for reverse proxies (Cloud Run, Nginx, Vercel)
-  app.set('trust proxy', 1);
+// Enable trust proxy for reverse proxies (Cloud Run, Nginx, Vercel)
+app.set('trust proxy', 1);
 
-  // Global rate limiter
-  const apiLimiter = rateLimit({
-    windowMs: 15 * 60 * 1000,
-    max: 200,
-    standardHeaders: true,
-    legacyHeaders: false,
-    message: { error: 'Too many requests from this IP, please try again after 15 minutes.' },
-  });
+// Global rate limiter
+const apiLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 200,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many requests from this IP, please try again after 15 minutes.' },
+});
 
-  app.use('/api/', apiLimiter);
-  app.use(cookieParser());
-  app.use(express.json({ limit: '50mb' }));
-  app.use(express.urlencoded({ extended: true, limit: '50mb' }));
+app.use('/api/', apiLimiter);
+app.use(cookieParser());
+app.use(express.json({ limit: '50mb' }));
+app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
-  /**
-   * AUTHENTICATION MIDDLEWARE
-   * Protects all /api/ endpoints (except public health check & oauth initial redirect)
-   */
-  const requireAuth = async (req: AuthenticatedRequest, res: express.Response, next: express.NextFunction) => {
-    const publicPaths = ['/api/health', '/api/youtube/auth', '/api/youtube/callback', '/api/youtube/auth-url'];
-    if (publicPaths.includes(req.path)) {
+/**
+ * AUTHENTICATION MIDDLEWARE
+ * Protects all /api/ endpoints (except public health check & oauth initial redirect)
+ */
+const requireAuth = async (req: AuthenticatedRequest, res: express.Response, next: express.NextFunction) => {
+  const publicPaths = ['/api/health', '/api/youtube/auth', '/api/youtube/callback', '/api/youtube/auth-url'];
+  if (publicPaths.includes(req.path)) {
+    return next();
+  }
+
+  try {
+    const authHeader = req.headers.authorization;
+    const token = authHeader && authHeader.startsWith('Bearer ') ? authHeader.split(' ')[1] : req.cookies?.['sb-access-token'];
+
+    if (token && supabaseServer) {
+      const { data, error } = await supabaseServer.auth.getUser(token);
+      if (!error && data?.user) {
+        req.user = { id: data.user.id, email: data.user.email };
+        return next();
+      }
+    }
+
+    const customUserId = (req.headers['x-user-id'] as string) || req.cookies?.['x-user-id'];
+    if (customUserId) {
+      req.user = { id: customUserId };
       return next();
     }
 
-    try {
-      const authHeader = req.headers.authorization;
-      const token = authHeader && authHeader.startsWith('Bearer ') ? authHeader.split(' ')[1] : req.cookies?.['sb-access-token'];
+    // Default system fallback user for local preview environment
+    req.user = { id: SYSTEM_DEFAULT_USER_ID, email: 'creator@channelos.ai' };
+    next();
+  } catch (err: any) {
+    req.user = { id: SYSTEM_DEFAULT_USER_ID };
+    next();
+  }
+};
 
-      if (token && supabaseServer) {
-        const { data, error } = await supabaseServer.auth.getUser(token);
-        if (!error && data?.user) {
-          req.user = { id: data.user.id, email: data.user.email };
-          return next();
-        }
-      }
-
-      const customUserId = (req.headers['x-user-id'] as string) || req.cookies?.['x-user-id'];
-      if (customUserId) {
-        req.user = { id: customUserId };
-        return next();
-      }
-
-      // Default system fallback user for local preview environment
-      req.user = { id: SYSTEM_DEFAULT_USER_ID, email: 'creator@channelos.ai' };
-      next();
-    } catch (err: any) {
-      req.user = { id: SYSTEM_DEFAULT_USER_ID };
-      next();
-    }
-  };
-
-  app.use('/api', requireAuth);
+app.use('/api', requireAuth);
 
   // Health Check
   app.get('/api/health', (_req, res) => {
@@ -1137,14 +1136,8 @@ async function startServer() {
     res.json({ success: true });
   });
 
-  // Serve Vite in development or dist static files in production
-  if (process.env.NODE_ENV !== 'production') {
-    const vite = await createViteServer({
-      server: { middlewareMode: true },
-      appType: 'spa',
-    });
-    app.use(vite.middlewares);
-  } else {
+  // Static file serving in production mode for non-Vercel environments (e.g. Docker / Cloud Run)
+  if (process.env.NODE_ENV === 'production' && !process.env.VERCEL) {
     const distPath = path.join(process.cwd(), 'dist');
     app.use(express.static(distPath));
     app.get('*', (_req, res) => {
@@ -1152,11 +1145,28 @@ async function startServer() {
     });
   }
 
-  app.listen(PORT, '0.0.0.0', () => {
-    console.log(`ChannelOS Production Server running on http://0.0.0.0:${PORT}`);
-  });
-}
+  // Start standalone server only when NOT on Vercel
+  if (!process.env.VERCEL && process.env.NODE_ENV !== 'test') {
+    if (process.env.NODE_ENV !== 'production') {
+      import('vite')
+        .then(async ({ createServer: createViteServer }) => {
+          const vite = await createViteServer({
+            server: { middlewareMode: true },
+            appType: 'spa',
+          });
+          app.use(vite.middlewares);
+          app.listen(PORT, '0.0.0.0', () => {
+            console.log(`ChannelOS Dev Server running on http://0.0.0.0:${PORT}`);
+          });
+        })
+        .catch((err) => {
+          console.error('Failed to initialize Vite middleware:', err);
+        });
+    } else {
+      app.listen(PORT, '0.0.0.0', () => {
+        console.log(`ChannelOS Production Server running on http://0.0.0.0:${PORT}`);
+      });
+    }
+  }
 
-startServer().catch((err) => {
-  console.error('Failed to start ChannelOS server:', err);
-});
+export default app;
