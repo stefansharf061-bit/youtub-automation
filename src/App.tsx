@@ -177,7 +177,14 @@ export default function App() {
           }
         } else {
           if (popup) popup.close();
-          alert('Google OAuth credentials (GOOGLE_CLIENT_ID & GOOGLE_CLIENT_SECRET) are missing in environment variables.');
+          // Only show missing credentials alert if backend explicitly indicates googleConfigured === false or error mentions missing credentials
+          if (data.googleConfigured === false || (data.error && data.error.toLowerCase().includes('missing'))) {
+            alert(data.error || 'Google OAuth credentials (GOOGLE_CLIENT_ID & GOOGLE_CLIENT_SECRET) are missing in environment variables.');
+          } else if (data.error) {
+            alert(`OAuth Error: ${data.error}`);
+          } else {
+            alert('Unable to initiate OAuth authorization URL. Please try again.');
+          }
         }
       } catch (err) {
         console.error('OAuth initiation error:', err);

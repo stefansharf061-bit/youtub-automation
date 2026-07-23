@@ -262,7 +262,7 @@ app.use(express.urlencoded({ extended: true, limit: '50mb' }));
  * Protects all /api/ endpoints (except public health check & oauth initial redirect)
  */
 const requireAuth = async (req: AuthenticatedRequest, res: express.Response, next: express.NextFunction) => {
-  const publicPaths = ['/api/health', '/api/youtube/auth', '/api/youtube/callback', '/api/youtube/auth-url'];
+  const publicPaths = ['/api/health', '/api/env-test', '/api/youtube/auth', '/api/youtube/callback', '/api/youtube/auth-url'];
   if (publicPaths.includes(req.path)) {
     return next();
   }
@@ -295,6 +295,20 @@ const requireAuth = async (req: AuthenticatedRequest, res: express.Response, nex
 };
 
 app.use('/api', requireAuth);
+
+  // Temporary Debug Endpoint for Environment Variables Verification
+  app.get('/api/env-test', (_req, res) => {
+    res.json({
+      GOOGLE_CLIENT_ID: !!getGoogleClientId(),
+      GOOGLE_CLIENT_SECRET: !!getGoogleClientSecret(),
+      GEMINI_API_KEY: !!process.env.GEMINI_API_KEY,
+      VITE_SUPABASE_URL: !!(process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL),
+      VITE_SUPABASE_ANON_KEY: !!(process.env.VITE_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY),
+      SUPABASE_SERVICE_ROLE_KEY: !!process.env.SUPABASE_SERVICE_ROLE_KEY,
+      NODE_ENV: process.env.NODE_ENV || null,
+      VERCEL_ENV: process.env.VERCEL_ENV || null,
+    });
+  });
 
   // Health & Detailed Environment Diagnostics Check
   app.get('/api/health', (_req, res) => {
