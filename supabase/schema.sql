@@ -186,7 +186,25 @@ CREATE POLICY "Users can access own publish logs"
     ON public.publish_logs FOR ALL 
     USING (auth.uid() = user_id);
 
--- 8. SUPABASE STORAGE BUCKETS SETUP
+-- 8. NOTIFICATIONS TABLE
+CREATE TABLE IF NOT EXISTS public.notifications (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id UUID NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
+    type TEXT NOT NULL DEFAULT 'info',
+    title TEXT NOT NULL,
+    message TEXT NOT NULL,
+    read BOOLEAN DEFAULT false,
+    link TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+ALTER TABLE public.notifications ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Users can access own notifications" 
+    ON public.notifications FOR ALL 
+    USING (auth.uid() = user_id);
+
+-- 9. SUPABASE STORAGE BUCKETS SETUP
 INSERT INTO storage.buckets (id, name, public) 
 VALUES 
     ('videos', 'videos', true),

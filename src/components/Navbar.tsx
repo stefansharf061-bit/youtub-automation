@@ -19,6 +19,7 @@ interface NavbarProps {
   darkMode: boolean;
   setDarkMode: (val: boolean) => void;
   onNavigate: (tab: string) => void;
+  onToggleYouTubeConnect?: () => void;
 }
 
 export const Navbar: React.FC<NavbarProps> = ({
@@ -28,6 +29,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   darkMode,
   setDarkMode,
   onNavigate,
+  onToggleYouTubeConnect,
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const unreadCount = notifications.filter((n) => !n.read).length;
@@ -80,10 +82,10 @@ export const Navbar: React.FC<NavbarProps> = ({
           </div>
         ) : (
           <button
-            onClick={() => onNavigate('settings')}
-            className="hidden md:flex items-center space-x-1.5 text-xs font-medium text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800/60 px-2.5 py-1 rounded-lg hover:bg-amber-100 dark:hover:bg-amber-900/40 transition-colors"
+            onClick={() => (onToggleYouTubeConnect ? onToggleYouTubeConnect() : onNavigate('settings'))}
+            className="hidden md:flex items-center space-x-1.5 text-xs font-semibold text-white bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-500 hover:to-rose-500 border border-red-500/20 px-3 py-1.5 rounded-xl shadow-sm hover:shadow transition-all"
           >
-            <Youtube className="w-3.5 h-3.5 text-red-500" />
+            <Youtube className="w-4 h-4 text-white" />
             <span>Connect YouTube Channel</span>
           </button>
         )}

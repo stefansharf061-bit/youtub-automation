@@ -163,22 +163,27 @@ export default function App() {
         console.error('Disconnect error:', err);
       }
     } else {
+      // Synchronously open popup to prevent browser popup blockers
+      const popup = window.open('about:blank', 'YouTubeAuthPopup', 'width=600,height=720,scrollbars=yes');
       try {
         const res = await fetch('/api/youtube/auth-url');
         const data = await res.json();
         if (data.authUrl) {
-          const width = 600;
-          const height = 700;
-          const left = window.screen.width / 2 - width / 2;
-          const top = window.screen.height / 2 - height / 2;
-          window.open(
-            data.authUrl,
-            'YouTube Google OAuth Authorization',
-            `width=${width},height=${height},top=${top},left=${left},scrollbars=yes`
-          );
+          if (popup && !popup.closed) {
+            popup.location.href = data.authUrl;
+          } else {
+            // If popup was blocked by browser, redirect current window directly
+            window.location.href = data.authUrl;
+          }
+        } else {
+          if (popup) popup.close();
+          alert('Google OAuth credentials (GOOGLE_CLIENT_ID & GOOGLE_CLIENT_SECRET) are missing in environment variables.');
         }
       } catch (err) {
         console.error('OAuth initiation error:', err);
+        if (popup) popup.close();
+        // Fallback to direct backend redirect route
+        window.location.href = '/api/youtube/auth';
       }
     }
   };
@@ -193,6 +198,7 @@ export default function App() {
         darkMode={darkMode}
         setDarkMode={setDarkMode}
         onNavigate={(tab) => setActiveTab(tab)}
+        onToggleYouTubeConnect={handleToggleYouTubeConnect}
       />
 
       <div className="flex-1 flex overflow-hidden">
