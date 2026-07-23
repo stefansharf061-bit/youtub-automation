@@ -21,9 +21,9 @@ import {
 import { VideoItem, AIReport, UserSettings, NotificationItem, PublishLog, YouTubeAccount } from './src/types.js';
 
 // Environment & Credentials Configuration
-const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID || '';
-const GOOGLE_CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET || '';
-const SECRET_KEY = GOOGLE_CLIENT_SECRET || process.env.JWT_SECRET || 'channelos-production-secret-key';
+const getGoogleClientId = () => process.env.GOOGLE_CLIENT_ID || '';
+const getGoogleClientSecret = () => process.env.GOOGLE_CLIENT_SECRET || '';
+const getSecretKey = () => process.env.GOOGLE_CLIENT_SECRET || process.env.JWT_SECRET || 'channelos-production-secret-key';
 const SYSTEM_DEFAULT_USER_ID = '00000000-0000-0000-0000-000000000000';
 
 // Supabase Server Client setup
@@ -87,7 +87,7 @@ async function withRetry<T>(fn: () => Promise<T>, maxRetries = 3, delayMs = 1000
 function createOAuthState(userId: string): string {
   const nonce = crypto.randomBytes(12).toString('hex');
   const payload = `${userId}:${nonce}:${Date.now()}`;
-  const signature = crypto.createHmac('sha256', SECRET_KEY).update(payload).digest('hex');
+  const signature = crypto.createHmac('sha256', getSecretKey()).update(payload).digest('hex');
   return Buffer.from(`${payload}:${signature}`).toString('base64url');
 }
 
@@ -101,7 +101,7 @@ function verifyOAuthState(state: string): string | null {
     if (parts.length !== 4) return null;
     const [userId, nonce, timestampStr, signature] = parts;
     const payload = `${userId}:${nonce}:${timestampStr}`;
-    const expectedSignature = crypto.createHmac('sha256', SECRET_KEY).update(payload).digest('hex');
+    const expectedSignature = crypto.createHmac('sha256', getSecretKey()).update(payload).digest('hex');
 
     if (crypto.timingSafeEqual(Buffer.from(signature), Buffer.from(expectedSignature))) {
       const age = Date.now() - parseInt(timestampStr, 10);
@@ -130,8 +130,8 @@ function getOAuth2ClientForUser(req: express.Request, userId: string) {
   const redirectUri = `${host}/api/youtube/callback`;
 
   const oauth2Client = new google.auth.OAuth2(
-    GOOGLE_CLIENT_ID,
-    GOOGLE_CLIENT_SECRET,
+    getGoogleClientId(),
+    getGoogleClientSecret(),
     redirectUri
   );
 
@@ -268,7 +268,7 @@ app.use('/api', requireAuth);
       service: 'ChannelOS Production YouTube Engine',
       timestamp: new Date().toISOString(),
       geminiConfigured: !!process.env.GEMINI_API_KEY,
-      googleConfigured: !!GOOGLE_CLIENT_ID && !!GOOGLE_CLIENT_SECRET,
+      googleConfigured: !!getGoogleClientId() && !!getGoogleClientSecret(),
       supabaseConfigured: !!supabaseServer,
     });
   });
@@ -362,7 +362,7 @@ app.use('/api', requireAuth);
   app.get('/api/youtube/auth-url', async (req: AuthenticatedRequest, res) => {
     const userId = req.user?.id || SYSTEM_DEFAULT_USER_ID;
     
-    if (!GOOGLE_CLIENT_ID || !GOOGLE_CLIENT_SECRET) {
+    if (!getGoogleClientId() || !getGoogleClientSecret()) {
       const account = await getUserYouTubeAccount(userId);
       return res.status(400).json({
         success: false,
@@ -418,7 +418,7 @@ app.use('/api', requireAuth);
   });
 
   app.get('/api/youtube/auth', (req: AuthenticatedRequest, res) => {
-    if (!GOOGLE_CLIENT_ID || !GOOGLE_CLIENT_SECRET) {
+    if (!getGoogleClientId() || !getGoogleClientSecret()) {
       return res.status(400).send(`
         <!DOCTYPE html>
         <html>
@@ -611,7 +611,7 @@ app.use('/api', requireAuth);
         videoCount: account.videoCount,
         connectedAt: account.connectedAt,
       } : { ...initialYouTubeAccount, connected: false },
-      googleConfigured: !!GOOGLE_CLIENT_ID && !!GOOGLE_CLIENT_SECRET,
+      googleConfigured: !!getGoogleClientId() && !!getGoogleClientSecret(),
     });
   });
 
