@@ -1204,7 +1204,7 @@ app.use('/api', requireAuth);
       settings,
       envStatus: {
         geminiApiKey: !!process.env.GEMINI_API_KEY,
-        googleClientId: !!process.env.GOOGLE_CLIENT_ID,
+        googleClientId: !!getGoogleClientId(),
         supabaseUrl: !!process.env.VITE_SUPABASE_URL || !!process.env.SUPABASE_URL,
       },
     });
