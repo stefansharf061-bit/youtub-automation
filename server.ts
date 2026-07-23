@@ -361,6 +361,26 @@ app.use('/api', requireAuth);
   // 3. GOOGLE OAUTH AUTH-URL & AUTH REDIRECT
   app.get('/api/youtube/auth-url', async (req: AuthenticatedRequest, res) => {
     const userId = req.user?.id || SYSTEM_DEFAULT_USER_ID;
+    
+    if (!GOOGLE_CLIENT_ID || !GOOGLE_CLIENT_SECRET) {
+      const account = await getUserYouTubeAccount(userId);
+      return res.status(400).json({
+        success: false,
+        error: 'Google OAuth Client ID & Secret are missing in server environment variables. Please configure GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET.',
+        googleConfigured: false,
+        connectedAccount: account ? {
+          connected: true,
+          channelId: account.channelId,
+          channelName: account.channelName,
+          channelHandle: account.channelHandle,
+          avatarUrl: account.avatarUrl,
+          subscriberCount: account.subscriberCount,
+          videoCount: account.videoCount,
+          connectedAt: account.connectedAt,
+        } : { ...initialYouTubeAccount, connected: false },
+      });
+    }
+
     const oauth2Client = getOAuth2ClientForUser(req, userId);
     const stateToken = createOAuthState(userId);
 
@@ -393,11 +413,38 @@ app.use('/api', requireAuth);
         videoCount: account.videoCount,
         connectedAt: account.connectedAt,
       } : { ...initialYouTubeAccount, connected: false },
-      googleConfigured: !!GOOGLE_CLIENT_ID && !!GOOGLE_CLIENT_SECRET,
+      googleConfigured: true,
     });
   });
 
   app.get('/api/youtube/auth', (req: AuthenticatedRequest, res) => {
+    if (!GOOGLE_CLIENT_ID || !GOOGLE_CLIENT_SECRET) {
+      return res.status(400).send(`
+        <!DOCTYPE html>
+        <html>
+          <head>
+            <title>Configuration Required - ChannelOS</title>
+            <style>
+              body { font-family: system-ui, -apple-system, sans-serif; background: #0f172a; color: #fff; text-align: center; padding: 60px 20px; }
+              .card { background: #1e293b; max-width: 480px; margin: 0 auto; padding: 32px; border-radius: 20px; border: 1px solid #334155; }
+              h2 { color: #f87171; margin-top: 0; }
+              p { color: #cbd5e1; font-size: 14px; line-height: 1.6; }
+              code { background: #0f172a; padding: 4px 8px; border-radius: 6px; color: #38bdf8; font-size: 13px; }
+              .btn { display: inline-block; background: #ef4444; color: #fff; padding: 10px 20px; border-radius: 10px; text-decoration: none; font-weight: bold; margin-top: 16px; }
+            </style>
+          </head>
+          <body>
+            <div class="card">
+              <h2>OAuth Configuration Missing</h2>
+              <p>Google OAuth credentials (<code>GOOGLE_CLIENT_ID</code> and <code>GOOGLE_CLIENT_SECRET</code>) are required to connect your YouTube account.</p>
+              <p>Please authorize Google OAuth access using the AI Studio setup interface.</p>
+              <a href="/settings" class="btn">Return to Platform Settings</a>
+            </div>
+          </body>
+        </html>
+      `);
+    }
+
     const userId = req.user?.id || SYSTEM_DEFAULT_USER_ID;
     const oauth2Client = getOAuth2ClientForUser(req, userId);
     const stateToken = createOAuthState(userId);
